@@ -1,0 +1,12 @@
+/data
+/logs
+/models
+/post
+.idea
+*.pyc
+.autoenv*
+/*.png
+/*.pdf
+/*.svg
+*.mat
+/pretrained_models

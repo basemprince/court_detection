@@ -1,0 +1,4 @@
+Open a terminal and execute:
+
+cd network
+python demo_tennis.py -d 0 config/wireframe.yaml pretrained_models\ht_lcnn\checkpoint.pth.tar <image_path.extension>
