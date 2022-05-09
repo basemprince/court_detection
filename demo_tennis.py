@@ -217,8 +217,17 @@ def main():
             print(court_points)
             print(court_points_new)
             print("----------------------------")
-            
+            for c in court_points_new:
+                cv2.circle(im, (int(c[0]), int(c[1])), 3, (255,0,0), cv2.FILLED)
+            cv2.imshow("im", im)
+            cv2.waitKey(0)  
+                      
             template_points = np.asarray([[147, 1839], [970, 1839], [10, 2388], [1107, 2388]])
+            court_reference = cv2.imread("pictures/court_reference.png", 0)
+            for c in template_points:
+                cv2.circle(court_reference, (int(c[0]), int(c[1])), 3, (255,0,0), cv2.FILLED)
+            cv2.imshow("Court", court_reference)
+            cv2.waitKey(0)
             # T, _, _ = best_fit_transform(template_points, court_points)
             T, status = cv2.findHomography(template_points, np.asarray(court_points_new))
             
