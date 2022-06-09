@@ -10,3 +10,5 @@
 /*.svg
 *.mat
 /pretrained_models
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
