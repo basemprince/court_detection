@@ -6,15 +6,27 @@ import matplotlib.pyplot as plt
 import math
 from functools import cmp_to_key
 import matplotlib.pyplot as plt
+from scipy.spatial import distance
+from itertools import combinations
 
 def import_image(img_loc):
     return skimage.io.imread(img_loc) 
+
+def import_court(court_loc):
+    return cv2.imread(court_loc, 0)
+    
+def court_borders(court_reference,court_factor = 1):
+    width = court_reference.shape[1]
+    height = court_reference.shape[0]
+    court_borders = np.asarray([[0, 0], [width/court_factor, 0], [width/court_factor, height*court_factor], [0, height*court_factor]])
+    return  np.float32(court_borders).reshape(-1,1,2)
 
 def gray_scale(image,dialation=3,kernel_size=3):
     kernel = np.ones((kernel_size,kernel_size), np.uint8)
     gray =  cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     gray = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)[1]
     gray = cv2.dilate(gray,kernel,iterations=dialation)
+    gray[gray > 0] = 1 
     return gray
 
 def get_intersection_1(a1, a2, b1, b2):
@@ -392,3 +404,214 @@ def border_order(target_lines_span,target_thetas,im):
     plt.show()
     plt.close()
     return borders
+
+def border_filter(borders,percent_borders,im):
+    borders_filtered = [[],[]]
+    vert_len = math.ceil(math.ceil(percent_borders*len(borders[0])) / 2.) * 2
+    hor_len = math.ceil(math.ceil(percent_borders*len(borders[1])) / 2.) * 2
+    for j in range(vert_len):
+        borders_filtered[0].append(borders[0][j])
+        if j!=0:
+            borders_filtered[0].append(borders[0][-j])
+    for j in range(hor_len):
+        borders_filtered[1].append(borders[1][j])
+        if j!=0:
+            borders_filtered[1].append(borders[1][-j])
+
+    print(borders_filtered[0][0])
+
+    for i in borders_filtered:
+        for j in range(len(i)):
+            plt.plot((i[j][0][1], i[j][1][1]),(i[j][0][0], i[j][1][0] ), c=[1,0,0])
+        plt.imshow(im)
+    plt.xlim((0, im.shape[1]))
+    plt.ylim((im.shape[0], 0))
+    plt.tight_layout() 
+    plt.gca().xaxis.set_major_locator(plt.NullLocator())
+    plt.gca().yaxis.set_major_locator(plt.NullLocator())
+    plt.show()
+    plt.close()
+    return borders_filtered
+
+
+def order_points(pts):
+	x_sort = pts[np.argsort(pts[:, 0]), :]
+	left_x = x_sort[:2, :]
+	right_x = x_sort[2:, :]
+	left_x = left_x[np.argsort(left_x[:, 1]), :]
+	(tl, bl) = left_x
+	dist = distance.cdist(tl[np.newaxis], right_x, "euclidean")[0]
+	(br, tr) = right_x[np.argsort(dist)[::-1], :]
+	return np.array([tl,bl,br,tr], dtype="float32")
+
+
+def homography_scorer(matrix,court_reference,im,gray):
+    """
+    Calculate score for homography matrix
+    """
+    court = cv2.warpPerspective(court_reference, matrix, (im.shape[1],im.shape[0]))
+    
+
+    court[court > 0] = 1    
+    correct = court * gray
+    wrong = court - correct
+    plt.figure()
+    plt.imshow(correct)
+    correct[correct >0] = 1
+
+    c_p = np.sum(correct)
+    w_p = np.sum(wrong)
+    return c_p - (0.5* w_p), correct, wrong
+
+
+def homography_builder(borders_filtered,court_borders,court_reference,im,gray):
+    # for trying the scores
+
+    max_score = -np.inf
+    max_mat = None
+    max_inv_mat = None
+    k = 0
+    best_conf = None
+    # Loop over every pair of horizontal lines and every pair of vertical lines
+    for horizontal_pair in list(combinations(borders_filtered[0], 2)):
+        for vertical_pair in list(combinations(borders_filtered[1], 2)):
+            h1, h2 = horizontal_pair
+            v1, v2 = vertical_pair
+            
+            # Finding intersection points of all lines
+            i1 = get_intersection_1(h1[0],h1[1], v1[0], v1[1])
+            i2 = get_intersection_1(h1[0],h1[1], v2[0], v2[1])
+            i3 = get_intersection_1(h2[0],h2[1], v1[0], v1[1])
+            i4 = get_intersection_1(h2[0],h2[1], v2[0], v2[1])
+
+            intersections = np.array([i1, i2, i3, i4])
+            intersections = order_points(intersections)
+            intersections[:,[0,1]]= intersections[:,[1,0]]
+            
+            if k < 15 & True:
+                plt.figure()
+                plt.plot((h1[0][1], h1[1][1]),(h1[0][0], h1[1][0] ), c=[0.9,0,0])
+                plt.plot((h2[0][1], h2[1][   1]),(h2[0][0], h2[1][0] ), c=[0.9,0,0])
+                plt.plot((v1[0][1], v1[1][1]),(v1[0][0], v1[1][0] ), c=[0,0.9,0])
+                plt.plot((v2[0][1], v2[1][1]),(v2[0][0], v2[1][0] ), c=[0,0.9,0])
+                for j, i in enumerate(intersections):
+                    plt.scatter(i[0],i[1], c = 'r',s=30)
+                    plt.text(i[0],i[1],s=str(j+1) , c= 'b',fontsize=40)
+                plt.imshow(im)
+                plt.show()
+                plt.close()
+            
+            T= cv2.getPerspectiveTransform(court_borders,intersections)
+            inv_T = cv2.invert(T)[1]
+            confi_score,correct, wrong = homography_scorer(T,court_reference,im,gray)
+
+
+
+            if max_score < confi_score:
+                fig, axes = plt.subplots(1, 2, figsize=(15, 15), sharex=True, sharey=True)
+                ax = axes.ravel()
+                max_score = confi_score
+                print(max_score)
+                max_mat = T
+                max_inv_mat = inv_T
+                best_int_pts = intersections
+
+
+                ax[0].plot((h1[0][1], h1[1][1]),(h1[0][0], h1[1][0] ), c=[1,0,0])
+                ax[0].plot((h2[0][1], h2[1][   1]),(h2[0][0], h2[1][0] ), c=[1,0,0])
+                ax[0].plot((v1[0][1], v1[1][1]),(v1[0][0], v1[1][0] ), c=[0,1,0])
+                ax[0].plot((v2[0][1], v2[1][1]),(v2[0][0], v2[1][0] ), c=[0,1,0])
+                for j, i in enumerate(intersections):
+                    ax[0].scatter(i[0],i[1], c = 'r',s=30)
+                    # plt.text(i[0],i[1],s=str(j+1) , c= 'b',fontsize=40)
+                ax[0].imshow(im)
+                ax[0].set_title('candid court borders',fontsize=26)
+                # ax[0].xaxis.set_major_locator(plt.NullLocator())
+                # ax[0].yaxis.set_major_locator(plt.NullLocator())
+
+                row,column = np.where(correct==1)
+                row1,column1 = np.where(wrong==1)
+                ax[1].scatter(column,row,c=(0.5,1,0),s=1)
+                ax[1].scatter(column1,row1,c='r',s=1)
+                ax[1].set_xlim(0,im.shape[1])
+                ax[1].set_ylim(0,im.shape[0])
+                ax[1].invert_yaxis()
+                ax[1].imshow(im)
+                # ax[1].xaxis.set_major_locator(plt.NullLocator())
+                # ax[1].yaxis.set_major_locator(plt.NullLocator())
+                ax[1].set_title('applied homography',fontsize=26)
+
+                for a in ax:
+                    a.set_axis_off()
+
+                plt.tight_layout() 
+            
+            k += 1
+    return best_int_pts
+
+
+def get_corners(H, limits):
+    Ny = float(limits[0])
+    Nx = float(limits[1])
+    # Apply H to corners of the image to determine bounds
+    Htr  = np.dot(H, np.array([0.0, Ny, 1.0]).flatten()) # Top left maps to here
+    Hbr  = np.dot(H, np.array([Nx,  Ny, 1.0]).flatten()) # Bottom right maps to here
+    Hbl  = np.dot(H, np.array([Nx, 0.0, 1.0]).flatten()) # Bottom left maps to here
+    Hcor = [Htr,Hbr,Hbl]
+    
+
+    # Check if corners in the transformed image map to infinity finite
+    finite = True 
+    for y in Hcor:
+        if y[2] == 0:
+            finite = False
+
+    return Hcor, finite
+
+def scale_matrix(H, limits): 
+    assert len(limits) >= 2 # can have color channels
+    assert limits[0] > 0 and limits[1] > 0
+    assert H.shape[0] == 3 and H.shape[1] == 3
+
+    # Get H * image corners
+    Hcor, finite = get_corners(H, limits)
+
+    # If corners in the transformed image are not finite, don't do scaling
+    if not finite:
+        print("Skipping scaling due to point mapped to infinity")
+        return H
+        
+    # Maximum coordinate that any corner maps to
+    k = [max([Hcor[j][i] / Hcor[j][2] for j in range(len(Hcor))])/float(limits[i]) for i in range(2)]
+    # Scale
+
+    k = max(k)
+    print("Scaling by %f\n" % k)
+    HS = np.array([[1.0/k,0.0,0.0],[0.0,1.0/k,0.0],[0.0,0.0,1.0]])
+
+    return np.dot(HS, H)
+
+
+def add_court_overlay(frame, homography):
+    court = cv2.warpPerspective(frame, homography,(frame.shape[1],frame.shape[0]), cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0,0,0))
+    return court
+
+def apply_homography(best_court_corners,court_borders,im):
+    homography_matrix = cv2.getPerspectiveTransform(best_court_corners,court_borders)
+    homography_matrix_scaled = scale_matrix(homography_matrix, im.shape)
+
+    im1 = np.copy(im)
+    court = add_court_overlay(im1, homography_matrix_scaled)
+    court = cv2.cvtColor(court, cv2.COLOR_RGB2BGR)
+    cv2.imshow("Court", court)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    plt.imshow(court)
+    plt.tight_layout() 
+    plt.gca().xaxis.set_major_locator(plt.NullLocator())
+    plt.gca().yaxis.set_major_locator(plt.NullLocator())
+    plt.xlim(0,im.shape[1])
+    plt.ylim(0,im.shape[0])
+    plt.gca().invert_yaxis()
+    plt.show()
+    plt.close()
