@@ -1,26 +1,14 @@
 # Court Detection using Deep Hough Transform Line Priors 
 
-Official implementation for [Deep-Hough-Transform-Line-Priors](https://arxiv.org/abs/2007.09493) (ECCV 2020) 
+This is a course project that implemented the use of the [Deep-Hough-Transform-Line-Priors](https://arxiv.org/abs/2007.09493) to detect tennis court lines and find the homography matrix. Check out the report for more detailed information.
 
-[Yancong Lin](https://yanconglin.github.io/), and [Silvia Laura Pintea](https://silvialaurapintea.github.io/), and [Jan C. van Gemert](http://jvgemert.github.io/)
+## Description
+Filtering the lines post detection is necessary to identify the true bounding box of the court and to calculate the homography matrix. The homography matrix can be utilized to warp the perspective and deployed in various other applications such as score tracking or player movement behaviour during the match.
 
-E-mail: y.lin-1ATtudelftDOTnl
+The process pipeline is as follows:
 
-Vision Lab, Delft University of Technology, the Netherlands
+![process pipeline](results/pipeline.png)
 
-## Introduction
+Three examples of applying and scoring the homography matrix:
 
-Classical work on line segment detection is knowledge-based; it uses carefully designed geometric priors using either image gradients, pixel groupings, or Hough transform variants. Instead, current deep learning methods do away with all prior knowledge and replace priors by training deep networks on large manually annotated datasets. Here, we reduce the dependency on labeled data by building on the classic knowledge-based priors while using deep networks to learn features. We add line priors through a trainable Hough transform block into a deep network. Hough transform provides the prior knowledge about global line parameterizations, while the convolutional layers can learn the local gradient-like line features. On the Wireframe and York Urban datasets we show that adding prior knowledge improves data efficiency as line priors no longer need to be learned from data.
-
-
-### Cite Deep Hough-Transform Line Priors
-
-If you find Deep Hough-Transform Line Priors useful in your research, please consider citing:
-```bash
-@article{lin2020deep,
-  title={Deep Hough-Transform Line Priors},
-  author={Lin, Yancong and Pintea, Silvia L and van Gemert, Jan C},
-  booktitle={EECV 2020},
-  year={2020}
-}
-```
+![process pipeline](results/homography_scoring.png)
