@@ -68,8 +68,6 @@ class hough_lines_prio:
         im = im[:, :, :3]
         im_resized = skimage.transform.resize(im, (512, 512)) * 255
         image = (im_resized - M.image.mean) / M.image.stddev
-        # cv2.imshow("img",image)
-        # cv2.waitKey(0) 
         image = torch.from_numpy(np.rollaxis(image, 2)[None].copy()).float()
         return image
     
