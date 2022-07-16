@@ -1,15 +1,13 @@
 
 #!/usr/bin/env python3
 
-import cv2
-import numpy as np
 import image_processor
 from hough_lines_prio import hough_lines_prio
 
 
-img_loc = "pictures/05.jpg"
+img_loc = "pictures/07.jpeg"
 court_loc = "pictures/court_reference.png"
-dialation = 5
+dialation = 6
 kernel_size = 3
 t = 0.94
 perc_tp_remove = 0.1
@@ -17,7 +15,7 @@ s_factor = 1.1
 court_factor = 1
 ransac_iters = 1000
 angle_threshold = 5 # degrees
-percent_borders = 0.25
+percent_borders = 0.3
 
 print("Processing {}".format(img_loc))
 

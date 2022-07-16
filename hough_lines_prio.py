@@ -45,7 +45,7 @@ class hough_lines_prio:
             vote_index = hough_transform(rows=128, cols=128, theta_res=3, rho_res=1)
             sio.savemat(self.C.io.vote_index, {'vote_index': vote_index})
         self.vote_index = torch.from_numpy(vote_index).float().contiguous().to(self.device)
-        print('load vote_index', vote_index.shape)
+        print('loading vote_index:', vote_index.shape)
 
         model = lcnn.models.hg(
             depth=self.M.depth,
@@ -94,7 +94,7 @@ class hough_lines_prio:
             H = self.model(input_dict)["preds"]
         lines = H["lines"][0].cpu().numpy() / 128 * im.shape[:2]
         scores = H["score"][0].cpu().numpy()
-        print('lines: ',lines, ', scores: ', scores)
+        print('hough lines and scores calculated')
         for i in range(1, len(lines)):
             if (lines[i] == lines[0]).all():
                 lines = lines[:i]
